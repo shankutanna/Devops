@@ -29,7 +29,7 @@ pipeline {
                 echo "Installing npm dependencies..."
                 sh '''
                     if [ -x "$(command -v npm)" ]; then
-                        echo "npm found: $(which npm)"
+                        echo "npm found at $(which npm)"
                     else
                         echo "npm not found! Please install Node.js and npm on the agent."
                         exit 1
@@ -55,25 +55,27 @@ pipeline {
         stage('Build Artifact') {
             steps {
                 script {
+                    // Folder to zip
                     def folderToZip = 'app'
 
-                    if (fileExists(folderToZip)) {
-                        echo "Zipping folder '${folderToZip}'..."
-                    } else {
+                    if (!fileExists(folderToZip)) {
                         echo "Folder '${folderToZip}' not found! Zipping entire repository instead."
                         folderToZip = '.'  // zip everything
+                    } else {
+                        echo "Zipping folder '${folderToZip}'..."
                     }
 
-                    // Safely check zip command and create artifact
-                    sh '''
+                    // Run zip safely
+                    sh """
                         if [ -x "$(command -v zip)" ]; then
-                            echo "zip found at $(which zip)"
+                            echo "zip found at \$(which zip)"
                         else
                             echo "zip command not found! Please install zip on the agent."
                             exit 1
                         fi
+
                         zip -r build.zip ${folderToZip}
-                    '''
+                    """
                 }
             }
         }
