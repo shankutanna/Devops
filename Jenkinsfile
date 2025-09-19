@@ -64,17 +64,16 @@ pipeline {
                         echo "Zipping folder '${folderToZip}'..."
                     }
 
-                    // Use single-quotes to avoid Groovy $ interpolation issues
-                    sh '''
-                        if [ -x "$(command -v zip)" ]; then
-                            echo "zip found at $(which zip)"
+                    sh """
+                        if [ -x "\\$(command -v zip)" ]; then
+                            echo "zip found at \\$(which zip)"
                         else
                             echo "zip command not found! Please install zip on the agent."
                             exit 1
                         fi
 
                         zip -r build.zip ${folderToZip}
-                    '''
+                    """
                 }
             }
         }
