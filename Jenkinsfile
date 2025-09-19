@@ -55,29 +55,25 @@ pipeline {
         stage('Build Artifact') {
             steps {
                 script {
-                    // Define the folder you intend to zip
                     def folderToZip = 'app'
 
-                    // Check if the folder exists, otherwise zip the whole repo
                     if (fileExists(folderToZip)) {
                         echo "Zipping folder '${folderToZip}'..."
-                        sh '''
-                            if ! command -v zip &> /dev/null; then
-                                echo "zip command not found! Please install zip on the agent."
-                                exit 1
-                            fi
-                        '''
-                        sh "zip -r build.zip ${folderToZip}"
                     } else {
                         echo "Folder '${folderToZip}' not found! Zipping entire repository instead."
-                        sh '''
-                            if ! command -v zip &> /dev/null; then
-                                echo "zip command not found! Please install zip on the agent."
-                                exit 1
-                            fi
-                        '''
-                        sh "zip -r build.zip ."
+                        folderToZip = '.'  // zip everything
                     }
+
+                    // Safely check zip command and create artifact
+                    sh '''
+                        if [ -x "$(command -v zip)" ]; then
+                            echo "zip found at $(which zip)"
+                        else
+                            echo "zip command not found! Please install zip on the agent."
+                            exit 1
+                        fi
+                        zip -r build.zip ${folderToZip}
+                    '''
                 }
             }
         }
@@ -113,6 +109,3 @@ pipeline {
         }
     }
 }
-
-
-
