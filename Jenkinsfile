@@ -2,34 +2,67 @@ pipeline {
     agent any
 
     environment {
-        GIT_REPO = 'https://github.com/shankutanna/Devops.git'
-        EMAIL    = 'umatanna9@gmail.com'
+        // You can add environment variables here if needed
+        NODE_ENV = 'production'
     }
 
     stages {
+
         stage('Checkout') {
             steps {
-                // Pull code from your GitHub repo
-                git url: "${GIT_REPO}", branch: 'main'
+                echo "Checking out the repository..."
+                checkout([$class: 'GitSCM', 
+                    branches: [[name: '*/main']], 
+                    userRemoteConfigs: [[url: 'https://github.com/shankutanna/Devops.git']]
+                ])
             }
         }
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                echo "Installing npm dependencies..."
+                sh '''
+                    if ! command -v npm &> /dev/null; then
+                        echo "npm not found! Please install Node.js and npm on the agent."
+                        exit 1
+                    fi
+                    npm install
+                '''
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                sh 'npm test'
+                echo "Running unit tests..."
+                sh '''
+                    if ! command -v node &> /dev/null; then
+                        echo "Node.js not found! Cannot run tests."
+                        exit 1
+                    fi
+                    npm test
+                '''
             }
         }
 
         stage('Build Artifact') {
             steps {
-                // Zip the app folder into build.zip
-                sh 'zip -r build.zip app/'
+                script {
+                    def folderToZip = 'app'
+
+                    if (fileExists(folderToZip)) {
+                        echo "Zipping folder '${folderToZip}'..."
+                        // Ensure zip is installed
+                        sh '''
+                            if ! command -v zip &> /dev/null; then
+                                echo "zip command not found! Please install zip."
+                                exit 1
+                            fi
+                        '''
+                        sh "zip -r build.zip ${folderToZip}"
+                    } else {
+                        error "Folder '${folderToZip}' not found! Cannot create artifact."
+                    }
+                }
             }
         }
 
@@ -41,56 +74,34 @@ pipeline {
 
         stage('Notification') {
             steps {
-                script {
-                    echo "✅ Build #${env.BUILD_NUMBER} of Job ${env.JOB_NAME} completed successfully."
+                echo "Sending build notification..."
+                emailext (
+                    subject: "Jenkins Build Notification: ${currentBuild.fullDisplayName}",
+                    body: "Build ${currentBuild.fullDisplayName} finished with status: ${currentBuild.currentResult}\n\nCheck console output at ${env.BUILD_URL}",
+                    to: "umatanna9@gmail.com"
+                )
+            }
+        }
 
-                    // Send email on success (requires Email Extension plugin configured in Jenkins)
-                    emailext(
-                        to: "${EMAIL}",
-                        subject: "SUCCESS: Job '${env.JOB_NAME}' Build #${env.BUILD_NUMBER}",
-                        body: """
-Hello,
-
-The Jenkins build has completed *successfully*.
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-Git Repository: ${GIT_REPO}
-
-Regards,  
-Jenkins
-"""
-                    )
-                }
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing workspace contents for debugging..."
+                sh 'ls -l'
             }
         }
     }
 
     post {
-        failure {
-            echo "❌ Build FAILED: Job ${env.JOB_NAME} Build #${env.BUILD_NUMBER}"
-            emailext(
-                to: "${EMAIL}",
-                subject: "FAILURE: Job '${env.JOB_NAME}' Build #${env.BUILD_NUMBER}",
-                body: """
-Hello,
-
-The Jenkins build has *FAILED*.
-
-Job: ${env.JOB_NAME}
-Build Number: ${env.BUILD_NUMBER}
-Git Repository: ${GIT_REPO}
-
-Please check console logs for details.
-
-Regards,  
-Jenkins
-"""
-            )
-        }
-
         always {
             cleanWs()
+            echo "✅ Workspace cleaned"
+        }
+        success {
+            echo "🎉 Build succeeded!"
+        }
+        failure {
+            echo "❌ Build FAILED!"
         }
     }
 }
+
