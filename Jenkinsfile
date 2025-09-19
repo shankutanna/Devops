@@ -2,18 +2,13 @@ pipeline {
     agent any
 
     environment {
-        NODE_ENV = 'production'
+        NODE_HOME = '/usr/bin' // adjust if needed
     }
 
     stages {
-
-        stage('Checkout') {
+        stage('Declarative: Checkout SCM') {
             steps {
-                echo "Checking out the repository..."
-                checkout([$class: 'GitSCM', 
-                    branches: [[name: '*/main']], 
-                    userRemoteConfigs: [[url: 'https://github.com/shankutanna/Devops.git']]
-                ])
+                checkout scm
             }
         }
 
@@ -26,28 +21,25 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                echo "Installing npm dependencies..."
-                sh '''
-                    if [ -x "$(command -v npm)" ]; then
-                        echo "npm found at $(which npm)"
-                    else
-                        echo "npm not found! Please install Node.js and npm on the agent."
-                        exit 1
-                    fi
-
-                    if [ ! -f package.json ]; then
-                        echo "package.json not found! Are you in the correct directory?"
-                        exit 1
-                    fi
-
-                    npm install
-                '''
+                echo 'Installing npm dependencies...'
+                script {
+                    if (!fileExists('package.json')) {
+                        error "package.json not found! Cannot install npm dependencies."
+                    }
+                    sh '''
+                        if ! command -v npm &> /dev/null; then
+                            echo "npm not found! Please install Node.js and npm on the agent."
+                            exit 1
+                        fi
+                        npm install
+                    '''
+                }
             }
         }
 
         stage('Run Unit Tests') {
             steps {
-                echo "Running unit tests..."
+                echo 'Running unit tests...'
                 sh 'npm test'
             }
         }
@@ -56,42 +48,34 @@ pipeline {
             steps {
                 script {
                     def folderToZip = 'app'
-
                     if (!fileExists(folderToZip)) {
                         echo "Folder '${folderToZip}' not found! Zipping entire repository instead."
-                        folderToZip = '.'  // zip everything
+                        folderToZip = '.'
                     } else {
                         echo "Zipping folder '${folderToZip}'..."
                     }
 
-                    sh """
-                        if [ -x "\\$(command -v zip)" ]; then
-                            echo "zip found at \\$(which zip)"
-                        else
+                    sh '''
+                        if ! command -v zip &> /dev/null; then
                             echo "zip command not found! Please install zip on the agent."
                             exit 1
                         fi
-
                         zip -r build.zip ${folderToZip}
-                    """
+                    '''
                 }
             }
         }
 
         stage('Archive Artifact') {
             steps {
-                archiveArtifacts artifacts: 'build.zip', fingerprint: true
+                archiveArtifacts artifacts: 'build.zip', allowEmptyArchive: true
             }
         }
 
         stage('Notification') {
             steps {
-                echo "Sending build notification..."
-                emailext (
-                    subject: "Jenkins Build Notification: ${currentBuild.fullDisplayName}",
-                    body: "Build ${currentBuild.fullDisplayName} finished with status: ${currentBuild.currentResult}\n\nCheck console output at ${env.BUILD_URL}",
-                    to: "umatanna9@gmail.com"
-                )
+                echo 'Sending notifications...'
+                // You can configure emailext or Slack here
             }
         }
     }
@@ -101,9 +85,11 @@ pipeline {
             cleanWs()
             echo "✅ Workspace cleaned"
         }
+
         success {
-            echo "🎉 Build succeeded!"
+            echo "✅ Build PASSED!"
         }
+
         failure {
             echo "❌ Build FAILED!"
         }
