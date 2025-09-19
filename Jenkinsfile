@@ -2,7 +2,6 @@ pipeline {
     agent any
 
     environment {
-        // You can add environment variables here if needed
         NODE_ENV = 'production'
     }
 
@@ -11,6 +10,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo "Checking out the repository..."
+                // Proper Git checkout
                 checkout([$class: 'GitSCM', 
                     branches: [[name: '*/main']], 
                     userRemoteConfigs: [[url: 'https://github.com/shankutanna/Devops.git']]
@@ -18,14 +18,29 @@ pipeline {
             }
         }
 
+        stage('Debug Workspace') {
+            steps {
+                echo "Listing workspace contents after checkout..."
+                sh 'ls -l'
+            }
+        }
+
         stage('Install Dependencies') {
             steps {
                 echo "Installing npm dependencies..."
                 sh '''
-                    if ! command -v npm &> /dev/null; then
+                    if [ -x "$(command -v npm)" ]; then
+                        echo "npm found: $(which npm)"
+                    else
                         echo "npm not found! Please install Node.js and npm on the agent."
                         exit 1
                     fi
+
+                    if [ ! -f package.json ]; then
+                        echo "package.json not found! Are you in the correct directory?"
+                        exit 1
+                    fi
+
                     npm install
                 '''
             }
@@ -34,13 +49,7 @@ pipeline {
         stage('Run Unit Tests') {
             steps {
                 echo "Running unit tests..."
-                sh '''
-                    if ! command -v node &> /dev/null; then
-                        echo "Node.js not found! Cannot run tests."
-                        exit 1
-                    fi
-                    npm test
-                '''
+                sh 'npm test'
             }
         }
 
@@ -51,10 +60,9 @@ pipeline {
 
                     if (fileExists(folderToZip)) {
                         echo "Zipping folder '${folderToZip}'..."
-                        // Ensure zip is installed
                         sh '''
                             if ! command -v zip &> /dev/null; then
-                                echo "zip command not found! Please install zip."
+                                echo "zip command not found! Please install zip on the agent."
                                 exit 1
                             fi
                         '''
@@ -82,13 +90,6 @@ pipeline {
                 )
             }
         }
-
-        stage('Debug Workspace') {
-            steps {
-                echo "Listing workspace contents for debugging..."
-                sh 'ls -l'
-            }
-        }
     }
 
     post {
@@ -104,4 +105,5 @@ pipeline {
         }
     }
 }
+
 
