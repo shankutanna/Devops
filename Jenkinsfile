@@ -55,7 +55,6 @@ pipeline {
         stage('Build Artifact') {
             steps {
                 script {
-                    // Folder to zip
                     def folderToZip = 'app'
 
                     if (!fileExists(folderToZip)) {
@@ -65,17 +64,17 @@ pipeline {
                         echo "Zipping folder '${folderToZip}'..."
                     }
 
-                    // Run zip safely
-                    sh """
+                    // Use single-quotes to avoid Groovy $ interpolation issues
+                    sh '''
                         if [ -x "$(command -v zip)" ]; then
-                            echo "zip found at \$(which zip)"
+                            echo "zip found at $(which zip)"
                         else
                             echo "zip command not found! Please install zip on the agent."
                             exit 1
                         fi
 
                         zip -r build.zip ${folderToZip}
-                    """
+                    '''
                 }
             }
         }
