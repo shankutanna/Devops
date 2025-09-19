@@ -10,7 +10,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 echo "Checking out the repository..."
-                // Proper Git checkout
                 checkout([$class: 'GitSCM', 
                     branches: [[name: '*/main']], 
                     userRemoteConfigs: [[url: 'https://github.com/shankutanna/Devops.git']]
@@ -56,8 +55,10 @@ pipeline {
         stage('Build Artifact') {
             steps {
                 script {
+                    // Define the folder you intend to zip
                     def folderToZip = 'app'
 
+                    // Check if the folder exists, otherwise zip the whole repo
                     if (fileExists(folderToZip)) {
                         echo "Zipping folder '${folderToZip}'..."
                         sh '''
@@ -68,7 +69,14 @@ pipeline {
                         '''
                         sh "zip -r build.zip ${folderToZip}"
                     } else {
-                        error "Folder '${folderToZip}' not found! Cannot create artifact."
+                        echo "Folder '${folderToZip}' not found! Zipping entire repository instead."
+                        sh '''
+                            if ! command -v zip &> /dev/null; then
+                                echo "zip command not found! Please install zip on the agent."
+                                exit 1
+                            fi
+                        '''
+                        sh "zip -r build.zip ."
                     }
                 }
             }
@@ -105,5 +113,6 @@ pipeline {
         }
     }
 }
+
 
 
